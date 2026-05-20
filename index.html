@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SBC Swipe - Catalogue</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#10b981" />
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('sw.js')
+          .then(() => console.log('Service Worker Enregistré !'))
+          .catch((err) => console.log('Erreur SW:', err));
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body
+    class="bg-slate-100 flex justify-center items-center h-screen overflow-hidden font-sans"
+  >
+    <div
+      class="w-full max-w-md h-full bg-white shadow-2xl relative flex flex-col overflow-hidden md:h-[85vh] md:border md:border-slate-300 md:rounded-3xl"
+    >
+      <header
+        class="flex justify-between items-center px-6 py-4 bg-white border-b border-slate-100 z-10"
+      >
+        <div class="text-xl font-bold text-slate-800 tracking-wide">
+          SBC <span class="text-emerald-500">SWIPE</span>
+        </div>
+        <button
+          onclick="ouvrirPanier()"
+          class="relative p-2 text-slate-600 hover:text-emerald-500 transition-colors"
+        >
+          <i class="fa-solid fa-basket-shopping text-2xl"></i>
+          <span
+            id="panier-badge"
+            class="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold hidden"
+            >0</span
+          >
+        </button>
+      </header>
+
+      <main class="flex-1 relative flex justify-center items-center p-4">
+        <div
+          id="pile-container"
+          class="w-full h-full relative flex justify-center items-center"
+        >
+          <p class="text-slate-400 font-medium animate-pulse">
+            Chargement des produits...
+          </p>
+        </div>
+      </main>
+
+      <footer
+        class="flex justify-center items-center gap-6 py-6 bg-white border-t border-slate-50 z-10"
+      >
+        <button
+          onclick="swiperLigne('gauche')"
+          class="w-14 h-14 bg-rose-50 text-rose-500 rounded-full border border-rose-100 shadow-sm hover:scale-110 active:scale-95 transition-transform flex items-center justify-center text-xl"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <button
+          onclick="retournerCarteActive()"
+          class="w-12 h-12 bg-sky-50 text-sky-500 rounded-full border border-sky-100 shadow-sm hover:scale-110 active:scale-95 transition-transform flex items-center justify-center text-lg"
+        >
+          <i class="fa-solid fa-info"></i>
+        </button>
+        <button
+          onclick="swiperLigne('droite')"
+          class="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full border border-emerald-100 shadow-sm hover:scale-110 active:scale-95 transition-transform flex items-center justify-center text-xl"
+        >
+          <i class="fa-solid fa-heart"></i>
+        </button>
+      </footer>
+    </div>
+
+    <script>
+      // On utilise des noms uniques pour éviter tout conflit
+      window.SBC_SUPABASE_URL = 'https://skyaikburzodtrpyildy.supabase.co';
+      window.SBC_SUPABASE_KEY =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNreWFpa2J1cnpvZHRycHlpbGR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMDM3NjMsImV4cCI6MjA5NDc3OTc2M30.dPkY8oMagbEnX6gUjdhW55icz_FVSCyWnqHaQuPDDdY';
+    </script>
+
+    <script src="script.js"></script>
+
+    <div
+      id="panier-modal"
+      class="fixed inset-0 bg-black/50 z-50 flex justify-center items-end opacity-0 pointer-events-none transition-opacity duration-300"
+    >
+      <div
+        id="panier-contenu"
+        class="w-full max-w-md bg-white rounded-t-3xl p-6 max-h-[80vh] flex flex-col translate-y-full transition-transform duration-300"
+      >
+        <div
+          class="flex justify-between items-center border-b border-slate-100 pb-4 mb-4"
+        >
+          <h3 class="text-lg font-bold text-slate-800">
+            <i class="fa-solid fa-basket-shopping text-emerald-500 mr-2"></i>
+            Mon Panier Local
+          </h3>
+          <button
+            onclick="fermerPanier()"
+            class="text-slate-400 hover:text-slate-600 p-1 text-xl"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div
+          id="panier-liste"
+          class="flex-1 overflow-y-auto space-y-3 pr-1"
+        ></div>
+
+        <div class="border-t border-slate-100 pt-4 mt-4 space-y-4">
+          <div class="flex justify-between items-baseline">
+            <span class="text-sm font-medium text-slate-500"
+              >Total estimé :</span
+            >
+            <span id="panier-total" class="text-2xl font-black text-emerald-600"
+              >0 <span class="text-sm font-bold">RMB</span></span
+            >
+          </div>
+          <button
+            onclick="envoyerCommandeWhatsApp()"
+            class="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:scale-98 text-white font-bold rounded-2xl shadow-lg shadow-emerald-100 flex items-center justify-center gap-3 transition-all"
+          >
+            <i class="fa-brands fa-whatsapp text-xl"></i> Passer la commande sur
+            WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
