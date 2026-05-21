@@ -37,7 +37,6 @@ function afficherPile() {
     const container = document.getElementById('pile-container');
     container.innerHTML = ''; 
 
-    // MODIFICATION : On utilise produitsFiltrés au lieu de produitsListe
     if (indexActuel >= produitsFiltrés.length) {
         container.innerHTML = `
             <div class="text-center p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -55,7 +54,6 @@ function afficherPile() {
         carte.id = `carte-${index}`;
         carte.className = "absolute w-full h-full bg-white rounded-2xl shadow-md border border-slate-200 p-5 flex flex-col justify-between transition-all duration-300 origin-bottom";
         
-        // MODIFICATION : Z-index basé sur les produits filtrés
         carte.style.zIndex = produitsFiltrés.length - index;
 
         if (index > indexActuel) {
@@ -63,21 +61,35 @@ function afficherPile() {
             carte.style.opacity = index - indexActuel > 2 ? 0 : 0.8;
         }
 
-        // Gestion du Carrousel d'images
-        const sampleImages = [
-            'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=500',
-            'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=500',
-            'https://images.unsplash.com/photo-1547592180-85f173990554?w=500'
-        ];
-        const listeImages = produit.images && produit.images.length > 0 ? produit.images : sampleImages;
+        // --- CORRECTION STRICTE : NETTOYAGE ET EXTRACTION DES IMAGES DE SUPABASE ---
+        let listeImages = [];
+
+        if (produit.images && Array.isArray(produit.images) && produit.images.length > 0) {
+            listeImages = produit.images;
+        } 
+        else if (produit.images && typeof produit.images === 'string' && produit.images.trim() !== '') {
+            let texteNettoye = produit.images.replace(/[{}"']/g, '');
+            listeImages = texteNettoye.split(',').map(url => url.trim());
+        }
 
         let imagesHtml = '';
         let indicateursHtml = ''; 
-        
-        listeImages.forEach((imgUrl, imgIndex) => {
-            imagesHtml += `<img src="${imgUrl}" id="img-${index}-${imgIndex}" class="carrousel-img absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${imgIndex === 0 ? 'opacity-100' : 'opacity-0'}">`;
-            indicateursHtml += `<div id="ind-${index}-${imgIndex}" class="h-1 flex-1 rounded-full transition-all ${imgIndex === 0 ? 'bg-emerald-500' : 'bg-slate-200'}"></div>`;
-        });
+
+        // Si nous avons récupéré vos vraies images
+        if (listeImages.length > 0) {
+            listeImages.forEach((imgUrl, imgIndex) => {
+              imagesHtml += `<img src="${imgUrl}" id="img-${index}-${imgIndex}" class="carrousel-img absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${imgIndex === 0 ? 'opacity-100' : 'opacity-0'}">`;
+                indicateursHtml += `<div id="ind-${index}-${imgIndex}" class="h-1 flex-1 rounded-full transition-all ${imgIndex === 0 ? 'bg-emerald-500' : 'bg-slate-200'}"></div>`;
+            });
+        } else {
+            // Si votre case est vide dans Supabase, fond gris propre sans fausse photo
+            imagesHtml = `
+                <div class="absolute inset-0 w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-2 rounded-xl border border-slate-200">
+                    <i class="fa-regular fa-image text-4xl text-slate-300"></i>
+                    <span class="text-xs font-medium">Aucune photo disponible</span>
+                </div>`;
+            indicateursHtml = `<div class="h-1 flex-1 rounded-full bg-slate-200"></div>`;
+        }
 
         const badgePromo = produit.est_promo ? 
             `<span class="absolute top-4 left-4 bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm z-20"><i class="fa-solid fa-star mr-1"></i> Offre Spéciale</span>` : '';
@@ -141,15 +153,16 @@ function afficherPile() {
         }
     });
 }
+
 // 3. LOGIQUE DU SWIPE
 function swiperLigne(direction) {
-  if (indexActuel >= produitsListe.length) return;
+  if (indexActuel >= produitsFiltrés.length) return;
 
   const carte = document.getElementById(`carte-${indexActuel}`);
   if (!carte) return;
 
   if (direction === 'droite') {
-    const produitFlashe = produitsListe[indexActuel];
+    const produitFlashe = produitsFiltrés[indexActuel];
     if (!panier.some((item) => item.id === produitFlashe.id)) {
       panier.push(produitFlashe);
       localStorage.setItem('sbc_panier', JSON.stringify(panier));
@@ -170,7 +183,7 @@ function swiperLigne(direction) {
 
 // 4. RETOURNER LA CARTE (BOUTON INFO)
 function retournerCarteActive() {
-  if (indexActuel >= produitsListe.length) return;
+  if (indexActuel >= produitsFiltrés.length) return;
 
   const faceAvant = document.getElementById(`face-avant-${indexActuel}`);
   const faceArriere = document.getElementById(`face-arriere-${indexActuel}`);
@@ -189,23 +202,17 @@ function retournerCarteActive() {
 
 // 5. GESTION DU PANIER
 function ouvrirPanier() {
-  document
-    .getElementById('panier-modal')
-    .classList.remove('opacity-0', 'pointer-events-none');
-  document
-    .getElementById('panier-contenu')
-    .classList.remove('translate-y-full');
+  document.getElementById('panier-modal').classList.remove('opacity-0', 'pointer-events-none');
+  document.getElementById('panier-contenu').classList.remove('translate-y-full');
   construireListePanier();
 }
 
 function fermerPanier() {
-  document
-    .getElementById('panier-modal')
-    .classList.add('opacity-0', 'pointer-events-none');
+  document.getElementById('panier-modal').classList.add('opacity-0', 'pointer-events-none');
   document.getElementById('panier-contenu').classList.add('translate-y-full');
 }
 
-function construireListePanier() {
+function construirListePanier() {
   const listeContainer = document.getElementById('panier-liste');
   listeContainer.innerHTML = '';
 
@@ -217,17 +224,13 @@ function construireListePanier() {
 
   panier.forEach((produit, index) => {
     const itemHtml = document.createElement('div');
-    itemHtml.className =
-      'flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100';
-    const imageSrc =
-      produit.images && produit.images.length > 0
-        ? produit.images[0]
-        : 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=100';
+    itemHtml.className = 'flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100';
+    const imageSrc = produit.images && produit.images.length > 0 ? (Array.isArray(produit.images) ? produit.images[0] : produit.images.replace(/[{}"']/g, '').split(',')[0].trim()) : '';
 
     itemHtml.innerHTML = `
             <div class="flex items-center gap-3 flex-1 min-w-0">
                 <input type="checkbox" checked id="check-${index}" onchange="calculerTotal()" class="w-5 h-5 rounded accent-emerald-500 cursor-pointer">
-                <img src="${imageSrc}" class="w-12 h-12 object-contain bg-white rounded-lg border p-1 shrink-0">
+                ${imageSrc ? `<img src="${imageSrc}" class="w-12 h-12 object-contain bg-white rounded-lg border p-1 shrink-0">` : `<div class="w-12 h-12 bg-slate-100 border rounded-lg flex items-center justify-center text-slate-400 shrink-0"><i class="fa-regular fa-image text-sm"></i></div>`}
                 <div class="min-w-0">
                     <h4 class="font-bold text-sm text-slate-800 truncate">${produit.nom}</h4>
                     <p class="text-xs text-slate-400 font-medium">${produit.reference}</p>
@@ -246,7 +249,7 @@ function retirerDuPanier(index) {
   panier.splice(index, 1);
   localStorage.setItem('sbc_panier', JSON.stringify(panier));
   actualiserBadgePanier();
-  construireListePanier();
+  construirListePanier();
 }
 
 function calculerTotal() {
@@ -281,9 +284,7 @@ function envoyerCommandeWhatsApp() {
   panier.forEach((produit, index) => {
     const checkbox = document.getElementById(`check-${index}`);
     if (checkbox && checkbox.checked) {
-      articles.push(
-        `- *${produit.nom}* (${produit.reference}) | ${produit.prix_rmb} RMB`
-      );
+      articles.push(`- *${produit.nom}* (${produit.reference}) | ${produit.prix_rmb} RMB`);
       total += parseFloat(produit.prix_rmb);
     }
   });
@@ -293,51 +294,36 @@ function envoyerCommandeWhatsApp() {
     return;
   }
 
-  let message = `Bonjour SBC, voici ma commande :\n\n${articles.join(
-    '\n'
-  )}\n\n*Total : ${total} RMB*`;
-  window.open(
-    `https://wa.me/2290197941099?text=${encodeURIComponent(message)}`,
-    '_blank'
-  );
+  let message = `Bonjour SBC, voici ma commande :\n\n${articles.join('\n')}\n\n*Total : ${total} RMB*`;
+  window.open(`https://wa.me/2290197941099?text=${encodeURIComponent(message)}`, '_blank');
 }
 
 function partagerProduit(index) {
-  const prod = produitsListe[index];
+  const prod = produitsFiltrés[index];
   const message = `Regarde : *${prod.nom}* (${prod.reference}) à ${prod.prix_rmb} RMB !`;
   if (navigator.share) {
-    navigator
-      .share({ title: prod.nom, text: message, url: window.location.href })
-      .catch(console.error);
+    navigator.share({ title: prod.nom, text: message, url: window.location.href }).catch(console.error);
   } else {
     navigator.clipboard.writeText(`${message} ${window.location.href}`);
     alert('Lien copié !');
   }
 }
-// FONCTION DE FILTRAGE CROISÉ (RECHERCHE + CATÉGORIE)
+
+// 6. FONCTIONS DE FILTRAGE CROISÉ
 function filtrerCatalogue() {
   const rechercheTexte = document.getElementById('barre-recherche').value.toLowerCase().trim();
 
   produitsFiltrés = produitsListe.filter(produit => {
-      // Condition 1 : Est-ce que ça correspond à la catégorie active ?
-      // (Pour ce test, assurez-vous d'avoir une colonne 'categorie' textuelle dans Supabase)
       const correspondCategorie = (categorieActive === 'TOUT' || (produit.categorie && produit.categorie.toLowerCase() === categorieActive.toLowerCase()));
-
-      // Condition 2 : Est-ce que le nom ou la référence contient le mot recherché ?
-      const correspondRecherche = produit.nom.toLowerCase().includes(rechercheTexte) || 
-                                  produit.reference.toLowerCase().includes(rechercheTexte);
-
+      const correspondRecherche = produit.nom.toLowerCase().includes(rechercheTexte) || produit.reference.toLowerCase().includes(rechercheTexte);
       return correspondCategorie && correspondRecherche;
   });
 
-  // On réinitialise l'affichage au début de la nouvelle pile filtrée
   indexActuel = 0;
   afficherPile();
 }
 
-// ACTION CLIC SUR UN BOUTON DE CATÉGORIE
 function filtrerParCategorie(nomCategorie) {
-  // 1. Mettre à jour visuellement les boutons (éteindre l'ancien, allumer le nouveau)
   const boutons = document.querySelectorAll('#categories-container button');
   boutons.forEach(btn => {
       btn.classList.replace('bg-emerald-500', 'bg-slate-100');
@@ -353,9 +339,9 @@ function filtrerParCategorie(nomCategorie) {
       boutonSelectionne.classList.add('shadow-sm', 'font-bold');
   }
 
-  // 2. Appliquer le filtre
   categorieActive = nomCategorie;
   filtrerCatalogue();
 }
+
 // Lancement au démarrage
 chargerProduits();
